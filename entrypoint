@@ -1,46 +1,159 @@
 #!/bin/sh
 
-if [ -n "$DEBUG" ]; then
-    set -x
+# FiveM docker entrypoint shell script
+# v1.0
+# Author: ntr001 <https://github.com/ntr001>
+#
+# Inspired by the original scripts of ...
+# - Spritsail <https://github.com/spritsail>
+# - Andruida <https://github.com/Andruida>
+
+_config_volume="/txData"
+if [ ! -z "${TXADMIN_DISABLE}" ]; then
+    _config_volume="/config"
+fi
+if [ ! -d "${_config_volume}" ]; then
+    mkdir "${_config_volume}"
 fi
 
-if ! find . -mindepth 1 | read -r; then
-    echo "Creating default configs..."
-    cp -r /opt/cfx-server-data/* /config
-    RCON_PASS="${RCON_PASSWORD-$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 16)}"
-    sed -i "s/{RCON_PASS}/${RCON_PASS}/g" /config/server.cfg;
-    echo "----------------------------------------------"
-    echo "RCON password is set to: ${RCON_PASS}"
-    echo "----------------------------------------------"
-fi
+_server_cfg_file="server.cfg"
+if [ ! -z "${TXADMIN_DISABLE}" ]; then
+    if ! find . -mindepth 1 -maxdepth 1 | read; then
+        if [ ! -d "resources" ] && [ ! -s "${_server_cfg_file}" ]; then
+            echo "Creating default configs..."
+            cp -r /opt/cfx-server-data/* "${_config_volume}/"
+            if [ -f "${_config_volume}/README.md" ]; then
+                rm "${_config_volume}/README.md"
+            fi
+            if [ $? -ne 0 ]; then
+                echo "ERROR: unable to copy default config files into ${_config_volume} directory! Please check directory permissions on host storage!"
+                exit 1
+            fi
+        elif [ ! -s "${_server_cfg_file}" ]; then
+            echo "Creating default ${_server_cfg_file} only as resources directory exists already..."
+            cp /opt/cfx-server-data/${_server_cfg_file} "${_config_volume}/"
+            if [ $? -ne 0 ]; then
+                echo "ERROR: unable to create ${_server_cfg_file} file in ${_config_volume} directory! Please check directory permissions on host storage!"
+                exit 1
+            fi
+        fi
 
-if [ -z "$NO_ONESYNC" ]; then
-    ONESYNC_ARGS="+set onesync on +set onesync_population true"
-fi
+        if [ -s "${_server_cfg_file}" ]; then
+            _placeholder_count=$(grep -o -e '{.*}' ${_server_cfg_file} | wc -l)
+            if [ ${_placeholder_count} -gt 0 ]; then
+                echo "----------------------------------------------"
 
-CONFIG_ARGS=
-if [ -z "${NO_DEFAULT_CONFIG}" ]; then
-    CONFIG_ARGS="$CONFIG_ARGS $ONESYNC_ARGS +exec /config/server.cfg"
-fi
+                if [ $(grep "{RCON_PASSWORD}" ${_server_cfg_file} | wc -l) -gt 0 ]; then
+                    _rcon_password="${RCON_PASSWORD-$(tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 16)}"
+                    if [ $(sed -i "s/{RCON_PASSWORD}/${_rcon_password}/gw /dev/stdout" ${_server_cfg_file} | wc -l) -gt 0 ]; then
+                        echo "RCON password is set to: ${_rcon_password}"
+                    fi
+                fi
 
-# English is hard
-if [ -z "${NO_LICENSE_KEY}${NO_LICENCE_KEY}" ]; then
-    if [ -z "${LICENSE_KEY}" ] && [ -n "${LICENCE_KEY}" ]; then
-        LICENSE_KEY="${LICENCE_KEY}"
+                if [ $(grep "{FIVEM_PORT}" ${_server_cfg_file} | wc -l) -gt 0 ]; then
+                    _fivem_port=${FIVEM_PORT:-30120}
+                    if [ $(sed -i "s/{FIVEM_PORT}/${_fivem_port}/gw /dev/stdout" ${_server_cfg_file} | wc -l) -gt 0 ]; then
+                        echo "FiveM port is set to: ${_fivem_port}"
+                    fi
+                fi
+
+                if [ $(grep "{SV_HOSTNAME}" ${_server_cfg_file} | wc -l) -gt 0 ]; then
+                    _sv_hostname=${SV_HOSTNAME:-Default}
+                    if [ $(sed -i "s/{SV_HOSTNAME}/${_sv_hostname}/gw /dev/stdout" ${_server_cfg_file} | wc -l) -gt 0 ]; then
+                        echo "Server hostname is set to: ${_sv_hostname}"
+                    fi
+                fi
+
+                if [ $(grep "{STEAM_WEBAPIKEY}" ${_server_cfg_file} | wc -l) -gt 0 ]; then
+                    _steam_webapikey=${STEAM_WEBAPIKEY:-none}
+                    if [ $(sed -i "s/{STEAM_WEBAPIKEY}/${_steam_webapikey}/gw /dev/stdout" ${_server_cfg_file} | wc -l) -gt 0 ]; then
+                        echo "Steam webApi Key is set to: ${_steam_webapikey}"
+                    fi
+                fi
+
+                if [ $(grep "{LICENSE_KEY}" ${_server_cfg_file} | wc -l) -gt 0 ]; then
+                    _license_key=${LICENSE_KEY:-${LICENCE_KEY}}
+                    if [ -z ${_license_key} ]; then
+                        echo "ERROR: LICENSE_KEY parameter is missing!"
+                        echo "License key not found in environment, please create one at https://keymaster.fivem.net!"
+                        exit 1
+                    fi
+                    if [ $(sed -i "s/{LICENSE_KEY}/${_license_key}/gw /dev/stdout" ${_server_cfg_file} | wc -l) -gt 0 ]; then
+                        echo "FiveM license key is set to: ${_license_key}"
+                    fi
+                fi
+
+                echo "----------------------------------------------"
+            fi
+        fi
     fi
+else
+    echo "----------------------------------------------"
+        _txadmin_port=${TXADMIN_PORT:-40120}
+        echo "txAdminPort is set to: ${_txadmin_port}"
+        _server_profile=${SERVER_PROFILE:-default}
+        echo "serverProfile is set to: ${_server_profile}"
+    echo "----------------------------------------------"
+fi
 
-    if [ -z "${LICENSE_KEY}" ]; then
-        echo "License key not found in environment, please create one at https://keymaster.fivem.net!"
+_target_user=${PUID:-$(stat -c "%u" ${_config_volume})}
+_target_group=${PGID:-$(stat -c "%g" ${_config_volume})}
+
+if ! getent group "${_target_group}" | cut -d':' -f1 | read; then 
+  _groupname="fivem"
+  addgroup ${_groupname} -g "${_target_group}"
+else
+  _groupname=$(getent group "${_target_user}" | cut -d: -f1)
+fi
+
+if ! getent passwd "${_target_user}" | cut -d':' -f1 | read; then 
+  _username="fivem"
+  adduser ${_username} -D -G "${_groupname}" --uid "${_target_user}"
+else
+  _username=$(getent passwd "${_target_user}" | cut -d: -f1)
+fi
+
+if [ -d "${_config_volume}" ]; then
+    chown -R ${_username}:${_groupname} "${_config_volume}/"
+    if [ $? -ne 0 ]; then
+        echo "ERROR: unable to change file permissions recursively of config volume directory! -> ${_config_volume}"
         exit 1
     fi
-
-    CONFIG_ARGS="$CONFIG_ARGS +set sv_licenseKey ${LICENSE_KEY}"
+else
+    echo "ERROR: config volume directory not found! -> ${_config_volume}"
+    exit 1
 fi
 
-exec /opt/cfx-server/ld-musl-x86_64.so.1 \
-    --library-path "/usr/lib/v8/:/lib/:/usr/lib/" \
+if [ -z "${TXADMIN_DISABLE}" ]; then
+    _config_args="${_config_args:+${_config_args} }+set txDataPath /txData/ +set serverProfile ${_server_profile} +set txAdminPort ${_txadmin_port}"
+else
+    if [ ! -z "${ONESYNC}" ]; then
+        _onesync=${ONESYNC,,}
+        if [ "${_onesync}" != "on" ] && [ "${_onesync}" != "legacy" ] && [ "${_onesync}" != "off" ]; then
+            echo "ERROR: invalid ONESYNC parameter: ${ONESYNC}"
+            exit 1
+        fi
+    fi
+    if [ ! -z "${ONESYNC_POPULATION}" ]; then
+        _onesync_population=${ONESYNC_POPULATION,,}
+        if [ "${_onesync_population}" != "true" ] && [ "${_onesync_population}" != "false" ]; then
+            echo "ERROR: invalid ONESYNC_POPULATION parameter: ${_onesync_population}"
+            exit 1
+        fi
+    fi
+    _onesync=${_onesync:-on}
+    _onesync_population=${_onesync_population:-true}
+    _config_args="${_config_args:+${_config_args} }+set onesync ${_onesync} +set onesync_population ${_onesync_population}"
+    _config_args="${_config_args:+${_config_args} }+exec ${_config_volume}/${_server_cfg_file}"
+fi
+
+_exec_command="/opt/cfx-server/ld-musl-x86_64.so.1 --library-path \"/usr/lib/v8/:/lib/:/usr/lib/\" \
     -- \
-    /opt/cfx-server/FXServer \
-        +set citizen_dir /opt/cfx-server/citizen/ \
-        $CONFIG_ARGS \
-        $*
+    /opt/cfx-server/FXServer +set citizen_dir /opt/cfx-server/citizen/ $_config_args $*"
+echo "${_exec_command}"
+
+if [ ! -z "${_username}" ]; then
+    exec su "${_username}" -c "${_exec_command}"
+else
+    exec ${_exec_command}
+fi

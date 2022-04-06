@@ -2,15 +2,22 @@ version: '3'
 
 services:
   fivem:
-    image: spritsail/fivem
+    image: ntr001/fivem:master
     container_name: fivem
     restart: always
     stdin_open: true
     tty: true
     volumes:
-      - "/path/to/resources/folder:/config"
+      - "/path/to/config/folder:/config"
+      - "/path/to/txData/folder:/txData"
     ports:
       - "30120:30120"
       - "30120:30120/udp"
+      - "40120:40120"
     environment:
       LICENSE_KEY: "license-key-here"
+      RCON_PASS: "rcon password"
+      SV_HOSTNAME: "FiveM Server hostname"
+      FIVEM_PORT: "30120"
+      TXADMIN_PORT: "40120"
+      SERVER_PROFILE: "default"
