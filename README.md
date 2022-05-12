@@ -68,6 +68,7 @@ docker run -d \
 * `STEAM_WEBAPIKEY` - Optional. Steam Web API key, if you want to use [Steam authentication](https://steamcommunity.com/dev/apikey). Default value is: none
 * `ONESYNC` - Optional. Allowed values are [on | legacy | off]. Default value is: on
 * `ONESYNC_POPULATION` - Optional. Allowed values are [true | false]. Default value is: true
+* `GAME_BUILD` - Optional. Enforces a game build for clients to use. Default value is: 2545
 
 ### Docker volume persistent data permission handling
 
