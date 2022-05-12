@@ -1,5 +1,5 @@
-ARG FIVEM_NUM=5402
-ARG FIVEM_VER=5402-810a639673d8da03fe4b1dc2b922c9c0265a542e
+ARG FIVEM_NUM=5562
+ARG FIVEM_VER=5562-25984c7003de26d4a222e897a782bb1f22bebedd
 ARG DATA_VER=44fc68d7ee1b94ad67a211a6ff8234ce4ff760c8
 
 # Credit to Spritsail <https://github.com/spritsail> for the original image

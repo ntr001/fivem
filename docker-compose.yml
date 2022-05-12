@@ -21,3 +21,4 @@ services:
       FIVEM_PORT: "30120"
       TXADMIN_PORT: "40120"
       SERVER_PROFILE: "default"
+      GAME_BUILD: "2545"

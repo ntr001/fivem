@@ -83,6 +83,13 @@ if [ ! -z "${TXADMIN_DISABLE}" ]; then
                     fi
                 fi
 
+                if [ $(grep "{GAME_BUILD}" ${_server_cfg_file} | wc -l) -gt 0 ]; then
+                    _game_build=${GAME_BUILD:-2545}
+                    if [ $(sed -i "s/{GAME_BUILD}/${_game_build}/gw /dev/stdout" ${_server_cfg_file} | wc -l) -gt 0 ]; then
+                        echo "Server hostname is set to: ${_game_build}"
+                    fi
+                fi
+
                 echo "----------------------------------------------"
             fi
         fi
