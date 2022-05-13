@@ -19,6 +19,12 @@ RUN wget -O- http://runtime.fivem.net/artifacts/fivem/build_proot_linux/master/$
         | tar xz --strip-components=1 -C opt/cfx-server-data \
     && apk -p $PWD add tini
 
+RUN rm -rf opt/cfx-server/citizen/system_resources/monitor \
+    && mkdir opt/cfx-server/citizen/system_resources/monitor \
+    && wget -O monitor.$$.zip https://github.com/tabarra/txAdmin/releases/latest/download/monitor.zip \
+    && unzip -qq monitor.$$.zip -d opt/cfx-server/citizen/system_resources/monitor \
+    && rm -f monitor.$$.zip
+
 ADD server.cfg opt/cfx-server-data
 ADD entrypoint usr/bin/entrypoint
 
